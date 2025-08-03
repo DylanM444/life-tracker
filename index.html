@@ -1,0 +1,54 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lift Tracker</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+    .logbox { background: #222; color: #0f0; font-family: monospace; padding: 10px; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Lift Tracker</h1>
+  <input type="number" id="w1" placeholder="Set 1 weight">
+  <input type="number" id="r1" placeholder="Set 1 reps"><br><br>
+  <input type="number" id="w2" placeholder="Set 2 weight">
+  <input type="number" id="r2" placeholder="Set 2 reps"><br><br>
+  <input type="number" id="w3" placeholder="Set 3 weight">
+  <input type="number" id="r3" placeholder="Set 3 reps"><br><br>
+  <button onclick="sendData()">Save to Google Sheet</button>
+  <div class="logbox" id="log"></div>
+
+  <script>
+    function sendData() {
+      const weights = [parseInt(w1.value), parseInt(w2.value), parseInt(w3.value)];
+      const reps = [parseInt(r1.value), parseInt(r2.value), parseInt(r3.value)];
+      const best = Math.max(...weights);
+
+      const payload = {
+        lift: "front-squat",
+        weights,
+        reps,
+        best
+      };
+
+      const log = document.getElementById('log');
+      log.textContent = "Sending data:\n" + JSON.stringify(payload, null, 2);
+
+      fetch("https://script.google.com/macros/s/AKfycbwkV2kIasOx7txMGJxsqZJEycGMfxcZwAXmmYuc6M7yEyf6p_rgPAKJq3-rJSRPtCor/exec", {
+        method: "POST",
+        body: JSON.stringify(payload),
+        headers: {
+          "Content-Type": "application/json"
+        }
+      }).then(res => res.text()).then(text => {
+        log.textContent += "\n\nResponse:\n" + text;
+      }).catch(err => {
+        log.textContent += "\n\nError:\n" + err;
+      });
+    }
+  </script>
+</body>
+</html>
