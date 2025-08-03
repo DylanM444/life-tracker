@@ -1,0 +1,54 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Lift History</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <h1>Lift History</h1>
+  <input type="text" id="search" placeholder="Search by lift or date...">
+  <table id="history">
+    <thead>
+      <tr><th>Date</th><th>Lift</th><th>Sets</th><th>Best</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <nav>
+    <a href="index.html">📥 Log New Lift</a>
+  </nav>
+</div>
+
+<script>
+fetch("https://raw.githubusercontent.com/DylanM444/life-tracker/main/log.json")
+  .then(res => res.json())
+  .then(data => {
+    const tbody = document.querySelector("#history tbody");
+    const input = document.getElementById("search");
+
+    function render(filtered) {
+      tbody.innerHTML = "";
+      filtered.forEach(entry => {
+        const row = document.createElement("tr");
+        const sets = entry.sets.map(s => s.weight + "×" + s.reps).join(", ");
+        row.innerHTML = `
+          <td>${entry.date.slice(0, 10)}</td>
+          <td>${entry.lift}</td>
+          <td>${sets}</td>
+          <td>${entry.best}</td>`;
+        tbody.appendChild(row);
+      });
+    }
+
+    input.addEventListener("input", () => {
+      const term = input.value.toLowerCase();
+      const filtered = data.filter(e => 
+        e.lift.toLowerCase().includes(term) || e.date.includes(term));
+      render(filtered);
+    });
+
+    render(data.reverse());
+  });
+</script>

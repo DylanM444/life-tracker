@@ -3,52 +3,116 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lift Tracker</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-    .logbox { background: #222; color: #0f0; font-family: monospace; padding: 10px; margin-top: 20px; }
-  </style>
+  <title>Log a Lift</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Lift Tracker</h1>
-  <input type="number" id="w1" placeholder="Set 1 weight">
-  <input type="number" id="r1" placeholder="Set 1 reps"><br><br>
-  <input type="number" id="w2" placeholder="Set 2 weight">
-  <input type="number" id="r2" placeholder="Set 2 reps"><br><br>
-  <input type="number" id="w3" placeholder="Set 3 weight">
-  <input type="number" id="r3" placeholder="Set 3 reps"><br><br>
-  <button onclick="sendData()">Save to Google Sheet</button>
+<div class="container">
+  <h1>Log a New Lift</h1>
+
+  <select id="lift">
+    <option value="">Select a lift</option>
+    <option value="Front Squat">Front Squat</option>
+    <option value="Push Press">Push Press</option>
+    <option value="Snatch Pull Deadlift">Snatch Pull Deadlift</option>
+    <option value="Overhead Press">Overhead Press</option>
+    <option value="Other">Other (type below)</option>
+  </select>
+  <input type="text" id="customLift" placeholder="Custom Lift Name (if 'Other')">
+
+  <input type="number" id="w1" placeholder="Set 1 Weight (kg)">
+  <input type="number" id="r1" placeholder="Set 1 Reps">
+  <input type="number" id="w2" placeholder="Set 2 Weight (kg)">
+  <input type="number" id="r2" placeholder="Set 2 Reps">
+  <input type="number" id="w3" placeholder="Set 3 Weight (kg)">
+  <input type="number" id="r3" placeholder="Set 3 Reps">
+  <input type="number" id="best" placeholder="Best Set (kg)">
+  <button onclick="submitLift()">Submit Lift</button>
+
+  <div id="calc"></div>
   <div class="logbox" id="log"></div>
 
-  <script>
-    function sendData() {
-      const weights = [parseInt(w1.value), parseInt(w2.value), parseInt(w3.value)];
-      const reps = [parseInt(r1.value), parseInt(r2.value), parseInt(r3.value)];
-      const best = Math.max(...weights);
+  <nav>
+    <a href="history.html">🔍 View History</a>
+  </nav>
+</div>
 
-      const payload = {
-        lift: "front-squat",
-        weights,
-        reps,
-        best
-      };
+<script>
+async function submitLift() {
+  const liftDropdown = document.getElementById("lift").value;
+  const customLift = document.getElementById("customLift").value.trim();
+  const lift = customLift || liftDropdown;
+  if (!lift) return alert("Please enter or select a lift.");
 
-      const log = document.getElementById('log');
-      log.textContent = "Sending data:\n" + JSON.stringify(payload, null, 2);
+  const weights = [parseInt(w1.value), parseInt(w2.value), parseInt(w3.value)];
+  const reps = [parseInt(r1.value), parseInt(r2.value), parseInt(r3.value)];
+  const best = parseInt(best.value);
 
-      fetch("https://script.google.com/macros/s/AKfycbwkV2kIasOx7txMGJxsqZJEycGMfxcZwAXmmYuc6M7yEyf6p_rgPAKJq3-rJSRPtCor/exec", {
-        method: "POST",
-        body: JSON.stringify(payload),
-        headers: {
-          "Content-Type": "application/json"
-        }
-      }).then(res => res.text()).then(text => {
-        log.textContent += "\n\nResponse:\n" + text;
-      }).catch(err => {
-        log.textContent += "\n\nError:\n" + err;
-      });
-    }
-  </script>
-</body>
-</html>
+  const token = localStorage.getItem('github_token') || prompt("Enter your GitHub token:");
+  if (!token) return alert("Token required.");
+  localStorage.setItem('github_token', token);
+
+  const entry = {
+    date: new Date().toISOString(),
+    lift,
+    sets: [
+      { weight: weights[0], reps: reps[0] },
+      { weight: weights[1], reps: reps[1] },
+      { weight: weights[2], reps: reps[2] }
+    ],
+    best
+  };
+
+  const apiUrl = "https://api.github.com/repos/DylanM444/life-tracker/contents/log.json";
+  const headers = {
+    "Authorization": "token " + token,
+    "Accept": "application/vnd.github.v3+json"
+  };
+  const log = document.getElementById('log');
+  const calc = document.getElementById('calc');
+
+  // Show warm-up and backoff
+  const warmups = [0.4, 0.6, 0.8].map(p => Math.round(best * p));
+  const backoff = Math.round(best * 0.8);
+  calc.innerHTML = `
+    <h2>Warm-Up Suggestions:</h2>
+    <p>${warmups.join(" kg → ")} kg</p>
+    <h2>Backoff Set:</h2>
+    <p>3×5 at ${backoff} kg</p>
+  `;
+
+  log.textContent = "Saving lift to GitHub...";
+
+  try {
+    const res = await fetch(apiUrl, { headers });
+    const data = await res.json();
+    const existing = JSON.parse(atob(data.content));
+    existing.push(entry);
+    const updatedContent = btoa(JSON.stringify(existing, null, 2));
+    const result = await fetch(apiUrl, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({
+        message: "Add lift entry",
+        content: updatedContent,
+        sha: data.sha
+      })
+    });
+    const out = await result.json();
+    log.textContent = "✅ Lift saved. Commit: " + out.commit.sha;
+  } catch (err) {
+    log.textContent = "Creating new log file...";
+    const newContent = btoa(JSON.stringify([entry], null, 2));
+    const createRes = await fetch(apiUrl, {
+      method: "PUT",
+      headers,
+      body: JSON.stringify({
+        message: "Create log file",
+        content: newContent
+      })
+    });
+    const out = await createRes.json();
+    log.textContent = "✅ New log created. Commit: " + out.commit.sha;
+  }
+}
+</script>
