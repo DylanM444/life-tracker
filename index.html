@@ -38,7 +38,8 @@
 </div>
 
 <script>
-async function submitLift() {
+  window.submitLift = async function() 
+
   const liftDropdown = document.getElementById("lift").value;
   const customLift = document.getElementById("customLift").value.trim();
   const lift = customLift || liftDropdown;
